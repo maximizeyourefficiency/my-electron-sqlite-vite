@@ -486,6 +486,7 @@ function requireElectronSquirrelStartup() {
 }
 var electronSquirrelStartupExports = requireElectronSquirrelStartup();
 const started = /* @__PURE__ */ getDefaultExportFromCjs(electronSquirrelStartupExports);
+const { setdbPath, executeQuery, executeMany, executeScript, fetchOne, fetchMany, fetchAll, load_extension, backup, iterdump } = require("sqlite-electron");
 if (started) {
   require$$3$1.app.quit();
 }
@@ -506,6 +507,76 @@ require$$3$1.app.on("ready", createWindow);
 require$$3$1.app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     require$$3$1.app.quit();
+  }
+});
+require$$3$1.ipcMain.handle("potd", async (event, dbPath, isuri, autocommit) => {
+  try {
+    return await setdbPath(dbPath, isuri, autocommit);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("executeQuery", async (event, query, value) => {
+  try {
+    return await executeQuery(query, value);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("fetchone", async (event, query, value) => {
+  try {
+    return await fetchOne(query, value);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("fetchmany", async (event, query, size, value) => {
+  try {
+    return await fetchMany(query, size, value);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("fetchall", async (event, query, value) => {
+  try {
+    return await fetchAll(query, value);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("executeMany", async (event, query, values) => {
+  try {
+    return await executeMany(query, values);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("executeScript", async (event, scriptpath) => {
+  try {
+    return await executeScript(scriptpath);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("load_extension", async (event, path2) => {
+  try {
+    return await load_extension(path2);
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("backup", async (event, target, pages, name, sleep) => {
+  try {
+    return await backup(target, Number(pages), name, Number(sleep));
+  } catch (error) {
+    return error;
+  }
+});
+require$$3$1.ipcMain.handle("iterdump", async (event, path2, filter) => {
+  try {
+    return await iterdump(path2, filter);
+  } catch (error) {
+    return error;
   }
 });
 require$$3$1.app.on("activate", () => {

@@ -1,6 +1,7 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+const { setdbPath, executeQuery, executeMany, executeScript, fetchOne, fetchMany, fetchAll, load_extension, backup, iterdump } = require("sqlite-electron");
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -44,6 +45,86 @@ app.on('window-all-closed', () => {
   }
 });
 
+ipcMain.handle("potd", async (event, dbPath, isuri, autocommit) => {
+  try {
+    return await setdbPath(dbPath, isuri, autocommit)
+  } catch (error) {
+    return error
+  }
+});
+
+ipcMain.handle("executeQuery", async (event, query, value) => {
+  try {
+    return await executeQuery(query, value);
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("fetchone", async (event, query, value) => {
+  try {
+    return await fetchOne(query, value);
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("fetchmany", async (event, query, size, value) => {
+  try {
+    return await fetchMany(query, size, value);
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("fetchall", async (event, query, value) => {
+  try {
+    return await fetchAll(query, value);
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("executeMany", async (event, query, values) => {
+  try {
+    return await executeMany(query, values);
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("executeScript", async (event, scriptpath) => {
+  try {
+    return await executeScript(scriptpath);
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("load_extension", async (event, path) => {
+  try {
+    return await load_extension(path);
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("backup", async (event, target, pages, name, sleep) => {
+  try {
+    return await backup(target, Number(pages), name, Number(sleep));
+  } catch (error) {
+    return error;
+  }
+});
+
+ipcMain.handle("iterdump", async (event, path, filter) => {
+  try {
+    return await iterdump(path, filter);
+  } catch (error) {
+    return error;
+  }
+});
+
 app.on('activate', () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
@@ -54,3 +135,4 @@ app.on('activate', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
