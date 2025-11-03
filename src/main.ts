@@ -1,15 +1,51 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
+import fs from 'fs';
 import started from 'electron-squirrel-startup';
-const { setdbPath, executeQuery, executeMany, executeScript, fetchOne, fetchMany, fetchAll, load_extension, backup, iterdump } = require("sqlite-electron");
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
-  app.quit();
+// Import sqlite-electron (CommonJS-Modul)
+const {
+  setdbPath,
+  executeQuery,
+  executeMany,
+  executeScript,
+  fetchOne,
+  fetchMany,
+  fetchAll,
+  load_extension,
+  backup,
+  iterdump
+}: {
+  setdbPath: (dbPath: string, isuri?: boolean, autocommit?: boolean) => Promise<any>;
+  executeQuery: (query: string, value?: any) => Promise<any>;
+  executeMany: (query: string, values: any[]) => Promise<any>;
+  executeScript: (scriptPath: string) => Promise<any>;
+  fetchOne: (query: string, value?: any) => Promise<any>;
+  fetchMany: (query: string, size: number, value?: any) => Promise<any>;
+  fetchAll: (query: string, value?: any) => Promise<any>;
+  load_extension: (path: string) => Promise<any>;
+  backup: (target: string, pages: number, name: string, sleep: number) => Promise<any>;
+  iterdump: (path: string, filter?: string) => Promise<any>;
+} = require('sqlite-electron');
+
+// ---------------------------------------------------------
+// 🔧 Logging-System
+// ---------------------------------------------------------
+const logFile = path.join(app.getPath('userData'), 'db_access.log');
+
+function log(message: string, level: 'INFO' | 'ERROR' = 'INFO') {
+  const timestamp = new Date().toISOString();
+  const entry = `[${timestamp}] [${level}] ${message}`;
+  console.log(entry);
+  fs.appendFileSync(logFile, entry + '\n');
 }
 
-const createWindow = () => {
-  // Create the browser window.
+// ---------------------------------------------------------
+// 🪟 Fenster erstellen
+// ---------------------------------------------------------
+if (started) app.quit();
+
+const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -18,121 +54,141 @@ const createWindow = () => {
     },
   });
 
-  // and load the index.html of the app.
+  // @ts-ignore – diese Konstanten werden von Vite/Electron-Builder gesetzt
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    // @ts-ignore
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    // @ts-ignore
+    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  // Open the DevTools.
   mainWindow.webContents.openDevTools();
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// ---------------------------------------------------------
+// 🔌 App Events
+// ---------------------------------------------------------
 app.on('ready', createWindow);
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-ipcMain.handle("potd", async (event, dbPath, isuri, autocommit) => {
-  try {
-    return await setdbPath(dbPath, isuri, autocommit)
-  } catch (error) {
-    return error
-  }
-});
-
-ipcMain.handle("executeQuery", async (event, query, value) => {
-  try {
-    return await executeQuery(query, value);
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("fetchone", async (event, query, value) => {
-  try {
-    return await fetchOne(query, value);
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("fetchmany", async (event, query, size, value) => {
-  try {
-    return await fetchMany(query, size, value);
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("fetchall", async (event, query, value) => {
-  try {
-    return await fetchAll(query, value);
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("executeMany", async (event, query, values) => {
-  try {
-    return await executeMany(query, values);
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("executeScript", async (event, scriptpath) => {
-  try {
-    return await executeScript(scriptpath);
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("load_extension", async (event, path) => {
-  try {
-    return await load_extension(path);
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("backup", async (event, target, pages, name, sleep) => {
-  try {
-    return await backup(target, Number(pages), name, Number(sleep));
-  } catch (error) {
-    return error;
-  }
-});
-
-ipcMain.handle("iterdump", async (event, path, filter) => {
-  try {
-    return await iterdump(path, filter);
-  } catch (error) {
-    return error;
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+// ---------------------------------------------------------
+// 🧠 IPC Handler mit Logging
+// ---------------------------------------------------------
+
+ipcMain.handle('potd', async (_event: IpcMainInvokeEvent, dbPath: string, isuri?: boolean, autocommit?: boolean) => {
+  try {
+    const result = await setdbPath(dbPath, isuri, autocommit);
+    log(`✅ Verbindung zur Datenbank hergestellt: ${dbPath}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler bei Datenbankverbindung: ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
   }
 });
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+ipcMain.handle('executeQuery', async (_event: IpcMainInvokeEvent, query: string, value?: any) => {
+  try {
+    const result = await executeQuery(query, value);
+    log(`✅ Query erfolgreich ausgeführt: ${query}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler bei Query: ${query} → ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
 
+ipcMain.handle('fetchone', async (_event: IpcMainInvokeEvent, query: string, value?: any) => {
+  try {
+    const result = await fetchOne(query, value);
+    log(`✅ fetchOne erfolgreich: ${query}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler bei fetchOne: ${query} → ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
+
+ipcMain.handle('fetchmany', async (_event: IpcMainInvokeEvent, query: string, size: number, value?: any) => {
+  try {
+    const result = await fetchMany(query, size, value);
+    log(`✅ fetchMany erfolgreich (${size} Zeilen): ${query}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler bei fetchMany: ${query} → ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
+
+ipcMain.handle('fetchall', async (_event: IpcMainInvokeEvent, query: string, value?: any) => {
+  try {
+    const result = await fetchAll(query, value);
+    log(`✅ fetchAll erfolgreich: ${query}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler bei fetchAll: ${query} → ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
+
+ipcMain.handle('executeMany', async (_event: IpcMainInvokeEvent, query: string, values: any[]) => {
+  try {
+    const result = await executeMany(query, values);
+    log(`✅ executeMany erfolgreich: ${query}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler bei executeMany: ${query} → ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
+
+ipcMain.handle('executeScript', async (_event: IpcMainInvokeEvent, scriptPath: string) => {
+  try {
+    const result = await executeScript(scriptPath);
+    log(`✅ Script erfolgreich ausgeführt: ${scriptPath}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler beim Ausführen des Scripts: ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
+
+ipcMain.handle('load_extension', async (_event: IpcMainInvokeEvent, extPath: string) => {
+  try {
+    const result = await load_extension(extPath);
+    log(`✅ SQLite-Erweiterung geladen: ${extPath}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler beim Laden der Erweiterung: ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
+
+ipcMain.handle('backup', async (_event: IpcMainInvokeEvent, target: string, pages: number, name: string, sleep: number) => {
+  try {
+    const result = await backup(target, Number(pages), name, Number(sleep));
+    log(`✅ Backup erfolgreich: ${target}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler beim Backup: ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
+
+ipcMain.handle('iterdump', async (_event: IpcMainInvokeEvent, dumpPath: string, filter?: string) => {
+  try {
+    const result = await iterdump(dumpPath, filter);
+    log(`✅ Dump erfolgreich: ${dumpPath}`);
+    return result;
+  } catch (error: any) {
+    log(`❌ Fehler beim Dump: ${error.message || error}`, 'ERROR');
+    return { error: error.toString() };
+  }
+});
